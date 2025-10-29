@@ -23,7 +23,7 @@ double r  = 0.0;              // Direction (degrees)
 double v  = 0.0;              // Forward speed
 double a  = 0.0;              // Rotation speed
 double centerX, centerY;      // Window center
-double height = -5.0;          // 視点の高さ
+double height = -3.0;          // 視点の高さ
 
 /* Function Prototypes */
 void tree(double x, double y, double z);
@@ -31,6 +31,8 @@ void cube(GLfloat *color, double x, double y, double z);
 void drawGround(void);
 void house(double x, double y, double z);
 void world(void);
+void cactus(double x, double y, double z); // サボテン
+
 void scene(void);
 void display(void);
 void resize(int w, int h);
@@ -158,32 +160,49 @@ void world(void)
     }
 }
 
+void cactus(double x, double y, double z) {
+    glPushMatrix();
+    glTranslated(x, y, z); 
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, leafGreen);
+    for (int h = 0; h < 3; h++) {
+        glPushMatrix();
+        glTranslated(0.0, h * 1.0, 0.0);
+        glutSolidCube(1.0);
+        glPopMatrix();
+    }
+    glPopMatrix();
+}
+
 /* ================= Scene Setup ================= */
 
 void scene(void)
 {
     // Cubes
-    cube(red,    0.0, 1.0, -3.0);
-    cube(green,  0.0, 1.0,  3.0);
-    cube(blue,  -3.0, 1.0,  0.0);
-    cube(yellow, 3.0, 1.0,  0.0);
+    // cube(red,    0.0, 1.0, -3.0);
+    // cube(green,  0.0, 1.0,  3.0);
+    // cube(blue,  -3.0, 1.0,  0.0);
+    // cube(yellow, 0.0, 1.0,  0.0);
 
     // Trees
-    tree(4.0, 1.0, 0.0);
-    tree(-4.0, 1.0, 0.0);
+    tree(-4.0, 1.0, 5.0);
+    tree(4.0, 1.0, 4.0);
+
+    // サボテン
+    cactus(5.0, 1.0, -2.0);
+    cactus(4.0, 1.0, -5.0);
 
     // Fallen tree
-    glPushMatrix();
-    glTranslated(-4.0, 1.0, 0.0);
-    glRotated(90.0, 0.0, 0.0, 1.0); // Rotate 90 degrees around Z-axis to fall
-    tree(0.0, 0.0, 0.0);
-    glPopMatrix();
+    // glPushMatrix();
+    // glTranslated(-4.0, 1.0, 0.0);
+    // glRotated(90.0, 0.0, 0.0, 1.0); // Rotate 90 degrees around Z-axis to fall
+    // tree(0.0, 0.0, 0.0);
+    // glPopMatrix();
 
     // House
-    house(8.0, 1.0, 0.0);
+    house(-3.0, 1.0, -3.0);
 
     // Ground
-    drawGround();
+    // drawGround();
 
     // World blocks
     world();
