@@ -3,6 +3,9 @@
 #include <math.h>
 #include <GLUT/glut.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 /* Color Definitions */
 static GLfloat red[]        = { 0.8, 0.2, 0.2, 1.0 };
 static GLfloat green[]      = { 0.2, 0.8, 0.2, 1.0 };
@@ -17,29 +20,83 @@ static GLfloat leafGreen[]  = { 0.2, 0.8, 0.2, 1.0 };
 static GLfloat wallColor[]  = { 0.7, 0.4, 0.2, 1.0 };
 static GLfloat roofColor[]  = { 0.8, 0.1, 0.1, 1.0 };
 
+/* Global texture variables */
+GLuint texWood, texLeaf, texWall, texRoof, texCactus, texDirt, texCobblestone, texPlanks_oak;
+
 /* Global Variables */
 double ex = 0.0, ez = 0.0;    // Current position
 double r  = 0.0;              // Direction (degrees)
 double v  = 0.0;              // Forward speed
 double a  = 0.0;              // Rotation speed
 double centerX, centerY;      // Window center
-double height = -3.0;          // 視点の高さ
+double height = -2.0;          // 視点の高さ
 
 /* Function Prototypes */
 void tree(double x, double y, double z);
 void cube(GLfloat *color, double x, double y, double z);
 void drawGround(void);
 void house(double x, double y, double z);
+void house2(double x, double y, double z);
 void world(void);
-void cactus(double x, double y, double z); // サボテン
+void cactus(double x, double y, double z);
 
 void scene(void);
 void display(void);
 void resize(int w, int h);
 void keyboard(unsigned char key, int x, int y);
-void drug(int x, int y);
+void drag(int x, int y);
 void idle(void);
 void init(void);
+
+void loadTextures(void);
+void loadTexture(GLuint *texture, const char *filename);
+
+void drawTexturedCube(void);
+
+/* ================= Texture Loading ================= */
+
+void loadTexture(GLuint *texture, const char *filename)
+{
+    int width, height, nrChannels;
+    unsigned char *data = stbi_load(filename, &width, &height, &nrChannels, 0);
+    if (!data) {
+        fprintf(stderr, "Failed to load texture file %s\n", filename);
+        exit(1);
+    }
+
+    glGenTextures(1, texture);
+    glBindTexture(GL_TEXTURE_2D, *texture);
+
+    GLenum format = GL_RGB;
+    if (nrChannels == 1)
+        format = GL_RED;
+    else if (nrChannels == 3)
+        format = GL_RGB;
+    else if (nrChannels == 4)
+        format = GL_RGBA;
+
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    stbi_image_free(data);
+}
+
+void loadTextures(void)
+{
+    loadTexture(&texWood, "./wood.png");
+    loadTexture(&texLeaf, "./leaf.png");
+    loadTexture(&texWall, "./wall.png");
+    loadTexture(&texRoof, "./roof.png");
+    loadTexture(&texCactus, "./cactus.png");
+    loadTexture(&texDirt, "./dirt.png");
+    loadTexture(&texCobblestone, "./cobblestone.png");
+    loadTexture(&texPlanks_oak, "./planks_oak.png");
+}
 
 /* ================= Initialization ================= */
 
@@ -50,36 +107,97 @@ void init(void)
     glEnable(GL_CULL_FACE);
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
+
+    glEnable(GL_TEXTURE_2D);
+    loadTextures();
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glDisable(GL_LIGHTING);
 }
 
 /* ================= Drawing Functions ================= */
+
+void drawTexturedCube(void)
+{
+    // Draw a cube centered at origin with side length 1
+    // Each face has texture coordinates from (0,0) to (1,1)
+
+    glBegin(GL_QUADS);
+    // Front face (z = 0.5)
+    glNormal3f(0.0f, 0.0f, 1.0f);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.5f, -0.5f,  0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f( 0.5f, -0.5f,  0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( 0.5f,  0.5f,  0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.5f,  0.5f,  0.5f);
+
+    // Back face (z = -0.5)
+    glNormal3f(0.0f, 0.0f, -1.0f);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f( 0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.5f,  0.5f, -0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f( 0.5f,  0.5f, -0.5f);
+
+    // Left face (x = -0.5)
+    glNormal3f(-1.0f, 0.0f, 0.0f);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.5f, -0.5f,  0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.5f,  0.5f,  0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.5f,  0.5f, -0.5f);
+
+    // Right face (x = 0.5)
+    glNormal3f(1.0f, 0.0f, 0.0f);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f( 0.5f, -0.5f,  0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f( 0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( 0.5f,  0.5f, -0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f( 0.5f,  0.5f,  0.5f);
+
+    // Top face (y = 0.5)
+    glNormal3f(0.0f, 1.0f, 0.0f);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.5f,  0.5f,  0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f( 0.5f,  0.5f,  0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( 0.5f,  0.5f, -0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.5f,  0.5f, -0.5f);
+
+    // Bottom face (y = -0.5)
+    glNormal3f(0.0f, -1.0f, 0.0f);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f( 0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( 0.5f, -0.5f,  0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.5f, -0.5f,  0.5f);
+    glEnd();
+}
 
 void tree(double x, double y, double z)
 {
     glPushMatrix();
     glTranslated(x, y, z);
 
-    // Draw trunk (3 cubes tall)
-    glMaterialfv(GL_FRONT, GL_DIFFUSE, brown);
+    // Draw trunk (3 cubes tall) with wood texture
+    // glMaterialfv(GL_FRONT, GL_DIFFUSE, brown);
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, texWood);
     for (int h = 0; h < 3; h++) {
         glPushMatrix();
         glTranslated(0.0, h * 1.0, 0.0);
-        glutSolidCube(1.0);
+        drawTexturedCube();
         glPopMatrix();
     }
+    glDisable(GL_TEXTURE_2D);
 
-    // Draw leaves (3x3x3 cubes centered on top of trunk)
+    // Draw leaves (3x3x3 cubes centered on top of trunk) with leaf texture
     glMaterialfv(GL_FRONT, GL_DIFFUSE, leafGreen);
-    for (int x = -1; x <= 1; x++) {
-        for (int y = 3; y <= 5; y++) {
-            for (int z = -1; z <= 1; z++) {
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, texLeaf);
+    for (int xx = -1; xx <= 1; xx++) {
+        for (int yy = 3; yy <= 5; yy++) {
+            for (int zz = -1; zz <= 1; zz++) {
                 glPushMatrix();
-                glTranslated(x * 1.0, y * 1.0, z * 1.0);
-                glutSolidCube(1.0);
+                glTranslated(xx * 1.0, yy * 1.0, zz * 1.0);
+                drawTexturedCube();
                 glPopMatrix();
             }
         }
     }
+    glDisable(GL_TEXTURE_2D);
 
     glPopMatrix();
 }
@@ -89,7 +207,7 @@ void cube(GLfloat *color, double x, double y, double z)
     glPushMatrix();
     glTranslated(x, y, z);
     glMaterialfv(GL_FRONT, GL_DIFFUSE, color);
-    glutSolidCube(1.0);
+    drawTexturedCube();
     glPopMatrix();
 }
 
@@ -114,63 +232,176 @@ void house(double x, double y, double z)
 {
     glPushMatrix();
     glTranslated(x, y, z);
+    glEnable(GL_TEXTURE_2D);
 
-    // Walls (3x3x2 blocks)
-    glMaterialfv(GL_FRONT, GL_DIFFUSE, wallColor);
-    for (int h = 0; h < 2; h++) {
-        for (int i = -1; i <= 1; i++) {
-            for (int j = -1; j <= 1; j++) {
+    // 外壁の石
+    glBindTexture(GL_TEXTURE_2D, texCobblestone);
+    for (int h = 0; h < 3; h++) {
+        for (int i = -2; i <= 2; i++) {
+            for (int j = -2; j <= 2; j++) {
+                if((i == -2 && j == -2) || (i == -2 && j == 2) || (i == 2 && j == -2) || (i == 2 && j == 2)) continue;
+
                 glPushMatrix();
                 glTranslated(i * 1.0, h * 1.0, j * 1.0);
-                glutSolidCube(1.0);
+                drawTexturedCube();
                 glPopMatrix();
             }
         }
     }
+    
+    // 外壁の木
+    glBindTexture(GL_TEXTURE_2D, texWood);
+    for(int h = 0; h < 3; h++) {
+        glPushMatrix();
+        glTranslated(-2.0, h * 1.0, -2.0);
+        drawTexturedCube();
+        glPopMatrix();
 
-    // Roof (3 layers, stair-like)
-    glMaterialfv(GL_FRONT, GL_DIFFUSE, roofColor);
-    for (int layer = 0; layer < 3; layer++) {
-        int size = 2 - layer;
+        glPushMatrix();
+        glTranslated(-2.0, h * 1.0, 2.0);
+        drawTexturedCube();
+        glPopMatrix();
+
+        glPushMatrix();
+        glTranslated(2.0, h * 1.0, -2.0);
+        drawTexturedCube();
+        glPopMatrix();
+
+        glPushMatrix();
+        glTranslated(2.0, h * 1.0, 2.0);
+        drawTexturedCube();
+        glPopMatrix();
+    }
+
+
+    // 屋根
+    glBindTexture(GL_TEXTURE_2D, texPlanks_oak);
+    for (int layer = 0; layer < 4; layer++) {
+        int size = 3 - layer;
         for (int i = -size; i <= size; i++) {
             for (int j = -size; j <= size; j++) {
                 glPushMatrix();
-                glTranslated(i * 1.0, 2.0 + layer, j * 1.0);
-                glutSolidCube(1.0);
+                glTranslated(i * 1.0, 3.0 + layer, j * 1.0);
+                drawTexturedCube();
                 glPopMatrix();
             }
         }
     }
 
+    glDisable(GL_TEXTURE_2D);
+    glPopMatrix();
+}
+
+void house2(double x, double y, double z) {
+
+    glPushMatrix();
+    glTranslated(x, y, z);
+    glEnable(GL_TEXTURE_2D);
+
+    // 土台
+    glBindTexture(GL_TEXTURE_2D, texCobblestone);
+    for(int i = -2; i <= 2; i++) {
+        for(int j = -2; j <= 2; j++) {
+            glPushMatrix();
+            glTranslated(i * 1.0, 0.0, j * 1.0);
+            drawTexturedCube();
+            glPopMatrix();
+        }
+    }
+
+    // 外壁の木壁
+    glBindTexture(GL_TEXTURE_2D, texPlanks_oak);
+    for (int h = 0; h < 3; h++) {
+        for (int i = -2; i <= 2; i++) {
+            for (int j = -2; j <= 2; j++) {
+                if((i == -2 && j == -2) || (i == -2 && j == 2) || (i == 2 && j == -2) || (i == 2 && j == 2)) continue;
+
+                glPushMatrix();
+                glTranslated(i * 1.0, 1.0 + h * 1.0, j * 1.0);
+                drawTexturedCube();
+                glPopMatrix();
+            }
+        }
+    }
+    
+    // 外壁の石
+    glBindTexture(GL_TEXTURE_2D, texCobblestone);
+    for(int h = 0; h < 3; h++) {
+        glPushMatrix();
+        glTranslated(-2.0, 1.0 + h * 1.0, -2.0);
+        drawTexturedCube();
+        glPopMatrix();
+
+        glPushMatrix();
+        glTranslated(-2.0, 1.0 + h * 1.0, 2.0);
+        drawTexturedCube();
+        glPopMatrix();
+
+        glPushMatrix();
+        glTranslated(2.0, 1.0 + h * 1.0, -2.0);
+        drawTexturedCube();
+        glPopMatrix();
+
+        glPushMatrix();
+        glTranslated(2.0, 1.0 + h * 1.0, 2.0);
+        drawTexturedCube();
+        glPopMatrix();
+    }
+
+
+    // 屋根
+    for(int i = -2; i <= 2; i++) {
+        for(int j = -2; j <= 2; j++) {
+            if(i == -2 || i == 2 || j == -2 || j == 2) {
+                glBindTexture(GL_TEXTURE_2D, texWood);
+                glPushMatrix();
+                glTranslated(i * 1.0, 4.0, j * 1.0);
+                drawTexturedCube();
+                glPopMatrix();
+            } else {
+                glBindTexture(GL_TEXTURE_2D, texPlanks_oak);
+                glPushMatrix();
+                glTranslated(i * 1.0, 4.0, j * 1.0);
+                drawTexturedCube();
+                glPopMatrix();
+            }
+        }
+    }
+
+    glDisable(GL_TEXTURE_2D);
     glPopMatrix();
 }
 
 void world(void)
 {
-    for (int h = 0; h < 12; h++) {
-        for (int i = -6; i < 6; i++) {
-            for (int j = -6; j < 6; j++) {
-                glMaterialfv(GL_FRONT, GL_DIFFUSE, groundColor[(i + j) & 1]);
-                glPushMatrix();
-                glTranslated(i * 1.0, -h * 1.0, j * 1.0);
-                glutSolidCube(1.0);
-                glPopMatrix();
-            }
+    glEnable(GL_TEXTURE_2D);
+    for (int i = -10; i <= 10; i++) {
+        for (int j = -10; j <= 10; j++) {
+            // glMaterialfv(GL_FRONT, GL_DIFFUSE, groundColor[(i + j) & 1]);
+            glBindTexture(GL_TEXTURE_2D, texDirt);
+            glPushMatrix();
+            glTranslated(i * 1.0, 0.0, j * 1.0);
+            drawTexturedCube();
+            glPopMatrix();
         }
     }
+    glDisable(GL_TEXTURE_2D);
 }
 
 void cactus(double x, double y, double z) {
     glPushMatrix();
     glTranslated(x, y, z); 
-    glMaterialfv(GL_FRONT, GL_DIFFUSE, leafGreen);
+    // glMaterialfv(GL_FRONT, GL_DIFFUSE, leafGreen);
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, texCactus);
     for (int h = 0; h < 3; h++) {
         glPushMatrix();
         glTranslated(0.0, h * 1.0, 0.0);
-        glutSolidCube(1.0);
+        drawTexturedCube();
         glPopMatrix();
     }
     glPopMatrix();
+    glDisable(GL_TEXTURE_2D);
 }
 
 /* ================= Scene Setup ================= */
@@ -179,9 +410,6 @@ void scene(void)
 {
     // Cubes
     // cube(red,    0.0, 1.0, -3.0);
-    // cube(green,  0.0, 1.0,  3.0);
-    // cube(blue,  -3.0, 1.0,  0.0);
-    // cube(yellow, 0.0, 1.0,  0.0);
 
     // Trees
     tree(-4.0, 1.0, 5.0);
@@ -191,20 +419,13 @@ void scene(void)
     cactus(5.0, 1.0, -2.0);
     cactus(4.0, 1.0, -5.0);
 
-    // Fallen tree
-    // glPushMatrix();
-    // glTranslated(-4.0, 1.0, 0.0);
-    // glRotated(90.0, 0.0, 0.0, 1.0); // Rotate 90 degrees around Z-axis to fall
-    // tree(0.0, 0.0, 0.0);
-    // glPopMatrix();
-
-    // House
+    // 家
     house(-3.0, 1.0, -3.0);
 
-    // Ground
-    // drawGround();
+    // house2
+    house2(5.0, 1.0, 5.0);
 
-    // World blocks
+    // 地面
     world();
 }
 
@@ -212,6 +433,7 @@ void scene(void)
 
 void display(void)
 {
+
     static GLfloat lightpos[] = { 3.0, 4.0, -5.0, 1.0 };
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -249,17 +471,18 @@ void keyboard(unsigned char key, int x, int y)
     }
     switch (key) {
     case 's':
-        height += 0.5;
+        if(height > -1.0) break;
+        height += 0.2;
         break;
     case 'w':
-        height -= 0.5;
+        height -= 0.2;
         break;
     default:
         break;
     }
 }
 
-void drug(int x, int y)
+void drag(int x, int y)
 {
     int dx = x - centerX;
     int dy = y - centerY;
@@ -277,7 +500,7 @@ void idle(void)
     double rad = r * M_PI / 180.0;
 
     ex += v * sin(rad) * t;
-    ez += v * cos(rad) * t;
+    ez -= v * cos(rad) * t;
     r += a * t;
 
     glutPostRedisplay();
@@ -294,7 +517,7 @@ int main(int argc, char *argv[])
     glutDisplayFunc(display);
     glutReshapeFunc(resize);
     glutKeyboardFunc(keyboard);
-    glutMotionFunc(drug);
+    glutMotionFunc(drag);
     glutIdleFunc(idle);
 
     init();
